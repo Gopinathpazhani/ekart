@@ -18,7 +18,7 @@ pipeline {
         }
 
         // =========================
-        // Frontend Build
+        // Build Frontend Image
         // =========================
         stage('Frontend - Build Docker Image') {
             steps {
@@ -29,7 +29,7 @@ pipeline {
         }
 
         // =========================
-        // Backend Build
+        // Build Backend Image
         // =========================
         stage('Backend - Build Docker Image') {
             steps {
@@ -51,46 +51,38 @@ pipeline {
         }
 
         // =========================
-        // Push Docker Images
+        // Push Images to Docker Hub
         // =========================
         stage('Push Docker Images') {
             steps {
-                sh "docker push ${FRONTEND_REPO}:${IMAGE_TAG}"
-                sh "docker push ${BACKEND_REPO}:${IMAGE_TAG}"
+                sh """
+                docker push ${FRONTEND_REPO}:${IMAGE_TAG}
+                docker push ${BACKEND_REPO}:${IMAGE_TAG}
 
-                // Also tag as 'latest'
-                sh "docker tag ${FRONTEND_REPO}:${IMAGE_TAG} ${FRONTEND_REPO}:latest"
-                sh "docker tag ${BACKEND_REPO}:${IMAGE_TAG} ${BACKEND_REPO}:latest"
-                sh "docker push ${FRONTEND_REPO}:latest"
-                sh "docker push ${BACKEND_REPO}:latest"
+                docker tag ${FRONTEND_REPO}:${IMAGE_TAG} ${FRONTEND_REPO}:latest
+                docker tag ${BACKEND_REPO}:${IMAGE_TAG} ${BACKEND_REPO}:latest
+
+                docker push ${FRONTEND_REPO}:latest
+                docker push ${BACKEND_REPO}:latest
+                """
             }
         }
 
         // =========================
-        // Deploy Containers
+        // Deploy with Docker Compose
         // =========================
         stage('Deploy Containers') {
             steps {
-                // Stop old containers
-                sh 'docker rm -f frontend-container || true'
-                sh 'docker rm -f backend-container || true'
-
-                // Pull latest images
-                sh "docker pull ${FRONTEND_REPO}:latest"
-                sh "docker pull ${BACKEND_REPO}:latest"
-
-                // Start Backend (5000)
                 sh '''
-                docker run -d --name backend-container \
-                    -p 5000:8080 \
-                    ${BACKEND_REPO}:latest
-                '''
+                # Stop existing containers
+                docker compose down || true
 
-                // Start Frontend (3000)
-                sh '''
-                docker run -d --name frontend-container \
-                    -p 3000:80 \
-                    ${FRONTEND_REPO}:latest
+                # Pull latest images
+                docker pull ${FRONTEND_REPO}:latest
+                docker pull ${BACKEND_REPO}:latest
+
+                # Start everything with docker-compose.yml
+                docker compose up -d
                 '''
             }
         }
